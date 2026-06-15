@@ -1,65 +1,129 @@
-# IG Request Cleaner
+<div align="center">
 
-Local utility for reviewing pending Instagram follow requests and tracking which ones you manually cancel.
+# 🧹 IG Request Cleaner
 
-This tool does not log in to Instagram, scrape Instagram, click buttons, or bypass rate limits. It imports a file you provide, opens profile links for manual review, records your decisions, and enforces conservative pacing between manual "cancelled" confirmations.
+**A local queue & pacing assistant for clearing old Instagram follow requests — safely, slowly, and without losing progress.**
 
-## Why it exists
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)](LICENSE)
+[![Tests](https://img.shields.io/badge/tests-29%20passing-brightgreen?style=for-the-badge)](tests/)
+[![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey?style=for-the-badge)](https://github.com/vskrch/instagram-request-cleaner)
 
-Instagram does not provide a bulk cancel flow for old pending follow requests. This app gives you a durable local queue so you can work through an exported list without losing progress.
+[Features](#-features) · [Quick Start](#-quick-start) · [Usage Guide](#-usage-guide) · [CLI Reference](#-cli-reference) · [Safety](#-safety-first)
 
-## Install
+</div>
 
-Requires Python 3.11 or newer.
+---
+
+## 💡 The problem
+
+Instagram has **no bulk-cancel** for pending follow requests. If you've sent hundreds over the years, clearing them one-by-one is tedious — and doing it too fast can trigger warnings or checkpoints.
+
+**IG Request Cleaner** gives you a durable local queue: import your list once, work through it at a safe pace, and pick up exactly where you left off.
+
+> 🛡️ **This tool never logs into Instagram, scrapes pages, clicks buttons, or bypasses rate limits.**  
+> You review profiles and cancel requests yourself. The app handles queue, pacing, and progress.
+
+---
+
+## ✨ Features
+
+| | |
+|---|---|
+| 📥 **Multi-format import** | Instagram export JSON, CSV, TXT, or plain username lists |
+| 🖥️ **Web dashboard** | Local console at `http://127.0.0.1:8765` |
+| 🤖 **Assist Mode** | Auto-opens profiles, alerts you, enforces cooldowns |
+| ⏱️ **Smart pacing** | Random delays, hourly/daily caps, mandatory breaks |
+| 🧠 **Decision engine** | Auto-snoozes recent requests, prioritizes old ones |
+| 💬 **Optional LLM advisor** | Local heuristics or OpenAI-compatible endpoints |
+| 💾 **Self-healing SQLite** | WAL mode, integrity checks, automatic backups |
+| 🔒 **Privacy-first** | Runs locally; usernames masked from LLM by default |
+
+---
+
+## 🚀 Quick Start
+
+### 1️⃣ Clone & install
 
 ```bash
-cd /Users/venkatasai/Desktop/codex/instagram-request-cleaner
+git clone https://github.com/vskrch/instagram-request-cleaner.git
+cd instagram-request-cleaner
+
 python3 -m venv .venv
-. .venv/bin/activate
-python -m pip install -e .
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
+
+pip install -e .
 ```
 
-## Quick start
+### 2️⃣ Initialize & import
 
 ```bash
 ig-request-cleaner init
+ig-request-cleaner import path/to/your/pending_requests.json
+```
+
+Try the included sample first:
+
+```bash
 ig-request-cleaner import samples/pending_requests.sample.json
+```
+
+### 3️⃣ Launch the dashboard
+
+```bash
 ig-request-cleaner serve --open
 ```
 
-The web console defaults to:
+Your browser opens to **http://127.0.0.1:8765** — your local control center.
 
-```text
-http://127.0.0.1:8765
+---
+
+## 📖 Usage Guide
+
+### The recommended workflow
+
+```
+┌─────────────┐     ┌──────────────┐     ┌─────────────────┐     ┌──────────────┐
+│  1. Import  │ ──▶ │ 2. Start     │ ──▶ │ 3. Assist opens │ ──▶ │ 4. You cancel│
+│  your list  │     │  Assist Mode │     │  next profile   │     │  on Instagram│
+└─────────────┘     └──────────────┘     └─────────────────┘     └──────────────┘
+                                                                          │
+                     ┌──────────────┐     ┌─────────────────┐              │
+                     │ 6. Cooldown  │ ◀── │ 5. Mark         │ ◀────────────┘
+                     │    & repeat  │     │  Cancelled      │
+                     └──────────────┘     └─────────────────┘
 ```
 
-## Assist Mode
+**Step by step:**
 
-Assist Mode automates the local workflow:
+1. **Export** your pending follow requests from Instagram (or prepare a username list).
+2. **Import** the file into IG Request Cleaner.
+3. **Start Assist Mode** in the dashboard — it watches the queue and pacing state.
+4. When alerted (blink + beep), **open the profile** and check if the request is still pending.
+5. **Cancel manually** on Instagram — the app does not click for you.
+6. Return to the dashboard and click **Mark Cancelled** (or Skip / Snooze / Not Found).
+7. **Wait through the cooldown** — Assist Mode opens the next profile when it's safe.
+8. Repeat until your queue is clear. Progress is saved after every action.
 
-- watches the queue and pacing state
-- applies reversible minor decisions locally
-- auto-snoozes recent requests so you are not interrupted too early
-- prioritizes old or unknown-age requests for review
-- waits through cooldowns
-- optionally opens the next Instagram profile when it is safe to review
-- refreshes local/LLM advice
-- blinks and plays a short beep when human action is needed
-- waits for you to mark `Cancelled`, `Skip`, `Snooze`, or `Not Found`
+### Dashboard actions
 
-The remaining human step is intentional: you inspect Instagram and make the actual relationship change yourself. The tool handles queue decisions and pacing, but it never clicks Instagram buttons, reads your Instagram session, or tries to work around platform friction.
+| Button | What it does |
+|--------|--------------|
+| **Open Next** | Opens the next queued profile in your browser (only when pacing allows) |
+| **Mark Cancelled** | Records a cancellation and starts the cooldown timer |
+| **Skip** | Moves on without cancelling — request stays pending |
+| **Snooze** | Defers review to a later time |
+| **Not Found** | Profile unavailable or request already gone |
+| **Assist Mode** | Hands-free loop: wait → open → alert → wait for your decision |
 
-## Input formats
+### Getting your pending-request list
 
-Supported:
+Supported input formats:
 
-- Instagram export JSON using `relationships_follow_requests_sent`
-- JSON list of usernames or profile URLs
-- JSON objects with fields like `username`, `handle`, `title`, `value`, `href`, or `timestamp`
-- CSV with a `username` column, or first-column usernames
-- TXT with one username or profile URL per line
-
-Example:
+- 📦 Instagram export JSON (`relationships_follow_requests_sent`)
+- 📄 JSON array of usernames or profile URLs
+- 📊 CSV with a `username` column (or first-column usernames)
+- 📝 TXT with one username or URL per line
 
 ```json
 [
@@ -69,64 +133,70 @@ Example:
 ]
 ```
 
-## CLI
+---
+
+## 🖥️ CLI Reference
 
 ```bash
-ig-request-cleaner status
-ig-request-cleaner plan
-ig-request-cleaner advice
-ig-request-cleaner open-next
-ig-request-cleaner export --format csv --output export.csv
+# Core
+ig-request-cleaner init                          # Create / repair local state
+ig-request-cleaner import <file>                 # Import pending requests
+ig-request-cleaner serve [--open]                # Start web dashboard
+ig-request-cleaner status [--json]               # Queue summary
+
+# Workflow
+ig-request-cleaner plan                          # Apply minor decisions, show next item
+ig-request-cleaner open-next                     # Open next profile (if pacing allows)
+ig-request-cleaner advice                        # Get queue advice (local or LLM)
+
+# Data management
+ig-request-cleaner export --format csv -o out.csv
 ig-request-cleaner backup
-ig-request-cleaner doctor
+ig-request-cleaner doctor                        # Integrity & config checks
 ```
 
-Use a custom state file:
+### Custom state location
 
 ```bash
 ig-request-cleaner --db ./data/state.sqlite3 serve
-```
-
-Or:
-
-```bash
+# or
 export IGRC_DB=/absolute/path/to/state.sqlite3
 ```
 
-## Browser assist
+Default state path: `~/.ig-request-cleaner/state.sqlite3`
 
-The `open-next` command and the dashboard `Open Next` button open the next queued profile in your default browser only when pacing allows it. They do not inspect, scrape, or control Instagram.
+---
 
-After you manually cancel a request in Instagram, return to the dashboard and click `Mark Cancelled`. That starts the cooldown and blocks the next open/cancel workflow until the next allowed time.
+## ⏱️ Pacing defaults
 
-## Decision engine
+Conservative by design — adjust in dashboard settings if needed.
 
-The app makes minor local decisions by default:
+| Setting | Default |
+|---------|---------|
+| Delay between cancellations | **7–16 minutes** (randomized) |
+| Max per hour | **8** |
+| Max per day | **60** |
+| Break after every N cancellations | **12** → **45 min** break |
 
-- requests newer than `recent_request_snooze_days` are auto-snoozed
-- old requests are prioritized
-- unknown-age requests are surfaced for human review
-- duplicate confirmations do not create duplicate action events
+> ⚠️ These are **local guardrails**, not a guarantee Instagram will accept every action.  
+> If you see warnings, checkpoints, or login challenges — **stop** and lower your limits.
 
-Inspect the next decision from the CLI:
+---
 
-```bash
-ig-request-cleaner plan
-```
+## 🧠 Optional LLM advisor
 
-Disable local minor decisions by setting `Minor decisions` to `Manual` in the dashboard settings.
+The advisor suggests what to review next using local heuristics (default) or an OpenAI-compatible endpoint. Usernames are **masked by default**.
 
-## Optional LLM advisor
+<details>
+<summary><b>🔧 LLM configuration options</b></summary>
 
-The advisor can use a local heuristic or an OpenAI-compatible chat-completions endpoint. It never receives credentials from this app, and usernames are masked by default unless you opt in.
-
-Local-only mode is the default:
+**Local-only (default):**
 
 ```bash
 ig-request-cleaner advice
 ```
 
-NVIDIA NIM mode:
+**NVIDIA NIM:**
 
 ```bash
 export IGRC_LLM_PROVIDER=nim
@@ -135,9 +205,7 @@ export IGRC_LLM_MODEL=nvidia/nemotron-3-nano-30b-a3b
 ig-request-cleaner advice
 ```
 
-NVIDIA documents NIM LLM as OpenAI-compatible and exposes chat completions at `https://integrate.api.nvidia.com/v1/chat/completions`.
-
-Ollama or another local OpenAI-compatible server:
+**Ollama / local server:**
 
 ```bash
 export IGRC_LLM_PROVIDER=ollama
@@ -145,7 +213,7 @@ export IGRC_LLM_MODEL=llama3.1
 ig-request-cleaner advice
 ```
 
-Any OpenAI-compatible endpoint:
+**Any OpenAI-compatible endpoint:**
 
 ```bash
 export IGRC_LLM_PROVIDER=openai-compatible
@@ -154,58 +222,68 @@ export IGRC_LLM_MODEL=your-model
 export IGRC_LLM_API_KEY=optional-key
 ```
 
-Send actual usernames to the configured LLM only if you intentionally enable it:
+To send real usernames to the LLM (opt-in only):
 
 ```bash
 export IGRC_LLM_SHARE_USERNAMES=true
 ```
 
-## Pacing defaults
+</details>
 
-The defaults are intentionally conservative:
+---
 
-- 7 to 16 minutes between manual cancellation confirmations
-- 8 cancellations per hour
-- 60 cancellations per day
-- 45 minute break after every 12 cancellations
+## 🛡️ Safety first
 
-These are local guardrails, not a guarantee that Instagram will accept every action. If Instagram shows warnings, checkpoints, login challenges, or other friction, stop and lower the limits.
+| ✅ Does | ❌ Does not |
+|---------|-------------|
+| Import files you provide | Log into Instagram |
+| Open profile URLs in your browser | Scrape or read Instagram pages |
+| Track your decisions locally | Click Instagram buttons |
+| Enforce cooldowns between actions | Bypass rate limits or checkpoints |
+| Back up state before imports | Store Instagram credentials |
 
-## Self-healing behavior
+**Production tip:** Keep the server on `127.0.0.1`. Do not expose it publicly — the import endpoint can read local files your user account can access.
 
-- SQLite state is created automatically.
-- WAL mode is enabled for safer local writes.
-- The database is checked with `PRAGMA integrity_check` on startup.
-- Corrupt state files are moved into `backups/` and a clean state file is created.
-- A SQLite backup is created before every import.
-- Manual backups are available from the CLI and web UI.
-- Imports are idempotent and dedupe usernames case-insensitively.
-- LLM failures time out and fall back to local advice.
-- Browser-assist refuses to open the next profile while cooldown is active.
-- Direct status changes are also blocked server-side when pacing disallows a cancellation.
-- Minor queue decisions are persisted as events.
-- Imports and request bodies are capped at 10 MB.
-- Settings are clamped to conservative bounds instead of accepting unsafe zero-delay values.
+---
 
-## Production notes
+## 🔧 Self-healing & reliability
 
-Run the web server on `127.0.0.1` unless you intentionally want another machine to reach it. The import-by-path endpoint reads local files that your user account can read, so do not expose the server publicly.
+- SQLite with WAL mode and `PRAGMA integrity_check` on startup
+- Corrupt databases auto-moved to `backups/` with a fresh state created
+- Backup before every import; manual backups via CLI and dashboard
+- Idempotent imports with case-insensitive username deduplication
+- LLM timeouts fall back to local advice
+- Server-side pacing blocks unsafe cancellation bursts
+- Settings clamped to safe bounds (no zero-delay values)
 
-The safest workflow is:
+---
 
-1. Import the pending request file.
-2. Start Assist Mode.
-3. Let it wait, open the next profile, and alert you.
-4. Cancel the request manually in Instagram if it is still pending.
-5. Return to the app and click `Mark Cancelled`.
-6. Let Assist Mode wait for the cooldown and repeat.
-
-## Verify
+## 🧪 Development
 
 ```bash
+# Run tests
 PYTHONPATH=src python -m unittest discover -s tests
-python -m compileall src tests
+
+# Lint
 ruff check .
-python -m pip install -e .
+
+# Verify install
+pip install -e .
 ig-request-cleaner --version
 ```
+
+---
+
+## 📄 License
+
+MIT — use freely, modify freely, no warranty.
+
+---
+
+<div align="center">
+
+**Built for humans who sent too many follow requests and want them gone — responsibly.** 🎯
+
+[⭐ Star this repo](https://github.com/vskrch/instagram-request-cleaner) if it saves you from scroll-fatigue.
+
+</div>
