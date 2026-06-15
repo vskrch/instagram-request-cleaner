@@ -12,7 +12,7 @@ from typing import Any
 
 from .decision import decision_sort_key, decide_request, policy_from_settings
 from .importer import PendingRequestCandidate
-from .pacing import DEFAULT_SETTINGS, evaluate_pacing, next_cooldown_seconds, now_utc
+from .pacing import DEFAULT_SETTINGS, estimate_eta_seconds, evaluate_pacing, next_cooldown_seconds, now_utc
 
 
 SCHEMA_VERSION = 1
@@ -367,11 +367,17 @@ class Store:
             ]
             settings = self.settings(conn=conn)
             pacing = evaluate_pacing(settings, action_times)
+            pending = int(counts.get("pending", 0))
+            snoozed = int(counts.get("snoozed", 0))
+            eta = estimate_eta_seconds(
+                settings, action_times, pending + snoozed,
+            )
         return {
             "total": total,
             "counts": counts,
             "settings": settings,
             "pacing": pacing.__dict__,
+            "eta": eta,
             "db_path": str(self.db_path),
         }
 

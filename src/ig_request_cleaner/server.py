@@ -278,6 +278,17 @@ INDEX_HTML = """<!doctype html>
 
     <section class="stats" id="stats"></section>
 
+    <section class="progressBarWrap" id="progressBarWrap">
+      <div class="progressInfo">
+        <span id="progressText" class="progressText">0 of 0 completed</span>
+        <span id="etaText" class="etaText">ETA: calculating...</span>
+      </div>
+      <div class="progressTrack">
+        <div class="progressFill" id="progressFill" style="width: 0%"></div>
+      </div>
+      <div class="progressSubtext" id="progressSubtext"></div>
+    </section>
+
     <section class="grid">
       <div class="panel work">
         <div class="panelHead">
@@ -602,6 +613,75 @@ input, select {
   0%, 100% { box-shadow: var(--shadow); }
   50% { box-shadow: 0 0 0 4px rgba(155, 79, 0, 0.24), var(--shadow); }
 }
+.progressBarWrap {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  padding: 18px;
+  margin-bottom: 18px;
+}
+.progressInfo {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 10px;
+}
+.progressText {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.etaText {
+  font-size: 14px;
+  color: var(--accent-strong);
+  font-weight: 650;
+}
+.progressTrack {
+  height: 10px;
+  background: #e5e9ec;
+  border-radius: 999px;
+  overflow: hidden;
+}
+.progressFill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), #34d399);
+  border-radius: 999px;
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  min-width: 0%;
+}
+.progressFill.complete {
+  background: linear-gradient(90deg, #34d399, #06b6d4);
+}
+.progressSubtext {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.cooldownTimer {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #fff4df;
+  color: var(--warn);
+  border: 1px solid #f0d4a8;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-top: 10px;
+  font-size: 14px;
+  font-weight: 650;
+}
+.cooldownTimer .timerDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--warn);
+  animation: timerPulse 1s ease-in-out infinite;
+}
+@keyframes timerPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
 .toast {
   position: fixed;
   right: 18px;
@@ -689,6 +769,39 @@ function renderStats() {
   `).join("");
 }
 
+function renderProgress() {
+  const summary = state.summary;
+  if (!summary) return;
+  const eta = summary.eta;
+  const total = summary.total || 0;
+  const completed = count("cancelled") + count("skipped") + count("not_found");
+  const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+  $("progressText").textContent = `${completed} of ${total} completed`;
+  $("progressFill").style.width = `${pct}%`;
+  $("progressFill").classList.toggle("complete", pct >= 100);
+
+  if (eta) {
+    const paceLabel = eta.at_current_pace ? "at current pace" : "estimated from settings";
+    $("etaText").textContent = eta.remaining === 0
+      ? "All done!"
+      : `ETA: ${eta.estimated_human} (${paceLabel})`;
+    $("progressSubtext").textContent =
+      `${eta.completed_today} cancelled today · ${eta.remaining} remaining · avg ${formatInterval(eta.avg_cancellation_interval_seconds)} between cancels`;
+  } else {
+    $("etaText").textContent = "";
+    $("progressSubtext").textContent = "";
+  }
+}
+
+function formatInterval(seconds) {
+  if (!seconds || seconds <= 0) return "—";
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  if (mins > 0) return `${mins}m ${secs}s`;
+  return `${secs}s`;
+}
+
 function renderPacing() {
   const pacing = state.summary.pacing;
   const badge = $("paceState");
@@ -699,6 +812,25 @@ function renderPacing() {
   }
   const wait = pacing.next_allowed_at ? formatCountdown(pacing.next_allowed_at) : pacing.reason;
   badge.textContent = `${labelReason(pacing.reason)}: ${wait}`;
+}
+
+function renderCooldownTimer() {
+  const pacing = state.summary.pacing;
+  let existing = document.getElementById("cooldownTimer");
+  if (pacing.allowed) {
+    if (existing) existing.remove();
+    return;
+  }
+  if (!pacing.next_allowed_at) return;
+  if (!existing) {
+    existing = document.createElement("div");
+    existing.id = "cooldownTimer";
+    existing.className = "cooldownTimer";
+    const currentItemEl = $("currentItem");
+    currentItemEl.parentNode.insertBefore(existing, currentItemEl.nextSibling);
+  }
+  const wait = formatCountdown(pacing.next_allowed_at);
+  existing.innerHTML = `<span class="timerDot"></span> Next action in <strong>${wait}</strong>`;
 }
 
 function labelReason(reason) {
@@ -764,7 +896,9 @@ async function refresh() {
   state.current = next.item;
   state.decision = null;
   renderStats();
+  renderProgress();
   renderPacing();
+  renderCooldownTimer();
   renderCurrent();
   fillSettings();
   await refreshQueue();
@@ -1009,6 +1143,8 @@ refresh().catch((error) => toast(error.message));
 state.timer = setInterval(() => {
   if (!state.summary) return;
   renderPacing();
+  renderCooldownTimer();
+  renderProgress();
   const pacing = state.summary.pacing;
   if (!pacing.allowed && pacing.next_allowed_at && new Date(pacing.next_allowed_at).getTime() <= Date.now()) {
     refresh().catch((error) => toast(error.message));
