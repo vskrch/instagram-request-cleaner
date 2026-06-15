@@ -44,20 +44,21 @@ class EstimateETATests(unittest.TestCase):
     def test_no_history_uses_settings_midpoint(self) -> None:
         now = datetime(2026, 1, 1, 12, 0, tzinfo=UTC)
         result = estimate_eta_seconds(DEFAULT_SETTINGS, [], 10, now=now)
-        # Default min=420, max=960, midpoint=690
-        # 10 * 690 = 6900 seconds base
-        # break_every=12, so 0 full breaks for 10 items
+        # Default min=120, max=300, midpoint=210
+        # 10 * 210 = 2100 seconds base
+        # break_every=20, so 0 full breaks for 10 items
         self.assertEqual(result["remaining"], 10)
-        self.assertEqual(result["avg_cancellation_interval_seconds"], 690)
-        self.assertEqual(result["estimated_seconds"], 10 * 690)
+        self.assertEqual(result["avg_cancellation_interval_seconds"], 210)
+        self.assertEqual(result["estimated_seconds"], 10 * 210)
         self.assertFalse(result["at_current_pace"])
 
     def test_no_history_with_breaks(self) -> None:
         now = datetime(2026, 1, 1, 12, 0, tzinfo=UTC)
-        # 24 remaining, break every 12 = 2 breaks * 45min * 60 = 5400 extra
+        # 24 remaining, break_every=20, break_minutes=15
+        # 24 // 20 = 1 break * 15min * 60 = 900 extra
         result = estimate_eta_seconds(DEFAULT_SETTINGS, [], 24, now=now)
-        expected_base = 24 * 690  # 16560
-        expected_breaks = 2 * 45 * 60  # 5400
+        expected_base = 24 * 210  # 5040
+        expected_breaks = 1 * 15 * 60  # 900
         self.assertEqual(result["estimated_seconds"], expected_base + expected_breaks)
         self.assertEqual(result["remaining"], 24)
 
@@ -83,19 +84,19 @@ class EstimateETATests(unittest.TestCase):
             now.isoformat(),
         ]
         # avg interval = 600s (10 min), 14 remaining
-        # break_every=12 => 1 full break * 45*60 = 2700 extra
+        # break_every=20 => 0 full breaks (14 < 20)
         result = estimate_eta_seconds(DEFAULT_SETTINGS, actions, 14, now=now)
         self.assertEqual(result["avg_cancellation_interval_seconds"], 600)
         expected_base = 14 * 600
-        expected_breaks = 1 * 45 * 60
+        expected_breaks = 0
         self.assertEqual(result["estimated_seconds"], expected_base + expected_breaks)
 
     def test_single_action_uses_settings_midpoint(self) -> None:
         now = datetime(2026, 1, 1, 12, 0, tzinfo=UTC)
         actions = [now.isoformat()]
         result = estimate_eta_seconds(DEFAULT_SETTINGS, actions, 5, now=now)
-        # With only 1 action, fallback to midpoint = 690
-        self.assertEqual(result["avg_cancellation_interval_seconds"], 690)
+        # With only 1 action, fallback to midpoint = 210
+        self.assertEqual(result["avg_cancellation_interval_seconds"], 210)
         self.assertEqual(result["remaining"], 5)
 
     def test_completed_today_count(self) -> None:

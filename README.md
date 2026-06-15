@@ -167,16 +167,18 @@ Default state path: `~/.ig-request-cleaner/state.sqlite3`
 
 ---
 
-## ⏱️ Pacing defaults
+## ⏱️ Pacing & presets
 
-Conservative by design — adjust in dashboard settings if needed.
+Default is **Aggressive** — 2–5 min delays, 20/hour, 200/day. Fully customizable in the dashboard.
 
-| Setting | Default |
-|---------|---------|
-| Delay between cancellations | **7–16 minutes** (randomized) |
-| Max per hour | **8** |
-| Max per day | **60** |
-| Break after every N cancellations | **12** → **45 min** break |
+| Preset | Delay | Per hour | Per day | Break |
+|--------|-------|----------|---------|-------|
+| **Conservative** | 7–16 min | 8 | 60 | every 12 → 45 min |
+| **Balanced** | 3–7 min | 15 | 120 | every 15 → 30 min |
+| **Aggressive** (default) | 2–5 min | 20 | 200 | every 20 → 15 min |
+| **Max** | 1–3 min | 40 | 500 | every 30 → 10 min |
+
+Pick a preset or tweak every value manually — min/max delay, hourly/daily caps, break schedule, and snooze window.
 
 > ⚠️ These are **local guardrails**, not a guarantee Instagram will accept every action.  
 > If you see warnings, checkpoints, or login challenges — **stop** and lower your limits.

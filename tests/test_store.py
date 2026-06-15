@@ -77,10 +77,10 @@ class StoreTests(unittest.TestCase):
                 }
             )
 
-            self.assertEqual(settings["min_interval_seconds"], "60")
-            self.assertEqual(settings["max_interval_seconds"], "60")
+            self.assertEqual(settings["min_interval_seconds"], "30")
+            self.assertEqual(settings["max_interval_seconds"], "30")
             self.assertEqual(settings["max_actions_per_hour"], "1")
-            self.assertEqual(settings["max_actions_per_day"], "500")
+            self.assertEqual(settings["max_actions_per_day"], "1000")
 
     def test_invalid_status_filter_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

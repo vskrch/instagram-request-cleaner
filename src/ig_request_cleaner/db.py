@@ -12,7 +12,7 @@ from typing import Any
 
 from .decision import decision_sort_key, decide_request, policy_from_settings
 from .importer import PendingRequestCandidate
-from .pacing import DEFAULT_SETTINGS, estimate_eta_seconds, evaluate_pacing, next_cooldown_seconds, now_utc
+from .pacing import DEFAULT_SETTINGS, PRESETS, estimate_eta_seconds, evaluate_pacing, next_cooldown_seconds, now_utc
 
 
 SCHEMA_VERSION = 1
@@ -20,10 +20,10 @@ ACTION_EVENT_TYPES = {"cancelled"}
 VALID_STATUSES = {"pending", "cancelled", "skipped", "not_found", "snoozed", "archived"}
 MAX_EXPORT_ROWS = 250_000
 SETTING_BOUNDS: dict[str, tuple[int, int]] = {
-    "min_interval_seconds": (60, 86_400),
-    "max_interval_seconds": (60, 86_400),
+    "min_interval_seconds": (30, 86_400),
+    "max_interval_seconds": (30, 86_400),
     "max_actions_per_hour": (1, 120),
-    "max_actions_per_day": (1, 500),
+    "max_actions_per_day": (1, 1_000),
     "session_break_every": (0, 500),
     "session_break_minutes": (0, 1_440),
     "auto_minor_decisions": (0, 1),

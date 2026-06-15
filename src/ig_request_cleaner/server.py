@@ -12,6 +12,7 @@ from urllib.parse import parse_qs, urlparse
 
 from .browser_assist import open_next_profile
 from .db import Store
+from .pacing import PRESETS
 from .importer import ImportErrorWithContext, load_candidates, load_candidates_from_text
 from .llm import LLMAdvisor
 
@@ -134,6 +135,17 @@ def _make_handler(store: Store) -> type[BaseHTTPRequestHandler]:
                     return
                 if parsed.path == "/api/settings":
                     self._send_json({"ok": True, "settings": store.update_settings(body)})
+                    return
+                if parsed.path == "/api/presets":
+                    self._send_json({"ok": True, "presets": {k: dict(v) for k, v in PRESETS.items()}, "current": store.settings()})
+                    return
+                if parsed.path == "/api/preset":
+                    name = str(body.get("name", "")).strip().lower()
+                    if name not in PRESETS:
+                        self._send_error(HTTPStatus.BAD_REQUEST, f"Unknown preset: {name}. Valid: {', '.join(PRESETS)}")
+                        return
+                    settings = store.update_settings(PRESETS[name])
+                    self._send_json({"ok": True, "preset": name, "settings": settings})
                     return
                 if parsed.path == "/api/clear-cooldown":
                     self._send_json({"ok": True, "settings": store.clear_cooldown()})
@@ -335,22 +347,33 @@ INDEX_HTML = """<!doctype html>
       </div>
 
       <div class="panel">
-        <h2>Pacing</h2>
+        <div class="panelHead">
+          <h2>Pacing</h2>
+        </div>
+        <div class="presetBar">
+          <label class="presetLabel">Preset</label>
+          <div class="presetBtns" id="presetBtns">
+            <button class="presetBtn" data-preset="conservative" type="button">Conservative</button>
+            <button class="presetBtn" data-preset="balanced" type="button">Balanced</button>
+            <button class="presetBtn active" data-preset="aggressive" type="button">Aggressive</button>
+            <button class="presetBtn" data-preset="max" type="button">Max</button>
+          </div>
+        </div>
         <div class="settings">
-          <label>Min seconds<input id="min_interval_seconds" type="number" min="0"></label>
-          <label>Max seconds<input id="max_interval_seconds" type="number" min="0"></label>
-          <label>Max per hour<input id="max_actions_per_hour" type="number" min="0"></label>
-          <label>Max per day<input id="max_actions_per_day" type="number" min="0"></label>
-          <label>Break every<input id="session_break_every" type="number" min="0"></label>
-          <label>Break minutes<input id="session_break_minutes" type="number" min="0"></label>
+          <label>Min delay (sec)<input id="min_interval_seconds" type="number" min="30" max="86400"><span class="settingHint">Shortest wait between actions</span></label>
+          <label>Max delay (sec)<input id="max_interval_seconds" type="number" min="30" max="86400"><span class="settingHint">Longest wait between actions</span></label>
+          <label>Max per hour<input id="max_actions_per_hour" type="number" min="1" max="120"><span class="settingHint">Hourly action cap</span></label>
+          <label>Max per day<input id="max_actions_per_day" type="number" min="1" max="1000"><span class="settingHint">Daily action cap</span></label>
+          <label>Break every N<input id="session_break_every" type="number" min="0" max="500"><span class="settingHint">0 = no breaks</span></label>
+          <label>Break length (min)<input id="session_break_minutes" type="number" min="0" max="1440"><span class="settingHint">Minutes of rest</span></label>
           <label>Minor decisions<select id="auto_minor_decisions"><option value="1">Auto</option><option value="0">Manual</option></select></label>
-          <label>Recent snooze days<input id="recent_request_snooze_days" type="number" min="1" max="90"></label>
+          <label>Recent snooze days<input id="recent_request_snooze_days" type="number" min="1" max="90"><span class="settingHint">Auto-defer requests newer than N days</span></label>
         </div>
         <div class="actions left">
           <button id="saveSettingsBtn" class="button" type="button">Save</button>
           <button id="clearCooldownBtn" class="button secondary" type="button">Clear Cooldown</button>
         </div>
-        <p class="muted">Use lower limits if Instagram shows warnings or friction.</p>
+        <p class="muted" id="pacingWarning">Current: default aggressive — 2–5 min delays, 20/hour, 200/day.</p>
       </div>
 
       <div class="panel">
@@ -579,6 +602,51 @@ input, select {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
+}
+.settingHint {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+}
+.presetBar {
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+.presetLabel {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.presetBtns {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.presetBtn {
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.presetBtn:hover {
+  border-color: var(--accent);
+  color: var(--accent-strong);
+}
+.presetBtn.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
 }
 .advisorText {
   min-height: 96px;
@@ -949,6 +1017,14 @@ function formatImportStats(stats) {
   return `${stats.total} usernames: ${stats.added} added, ${stats.updated} updated, ${stats.unchanged} unchanged.`;
 }
 
+const PRESETS = {
+  conservative: { min_interval_seconds: 420, max_interval_seconds: 960, max_actions_per_hour: 8, max_actions_per_day: 60, session_break_every: 12, session_break_minutes: 45, recent_request_snooze_days: 14 },
+  balanced: { min_interval_seconds: 180, max_interval_seconds: 420, max_actions_per_hour: 15, max_actions_per_day: 120, session_break_every: 15, session_break_minutes: 30, recent_request_snooze_days: 10 },
+  aggressive: { min_interval_seconds: 120, max_interval_seconds: 300, max_actions_per_hour: 20, max_actions_per_day: 200, session_break_every: 20, session_break_minutes: 15, recent_request_snooze_days: 7 },
+  max: { min_interval_seconds: 60, max_interval_seconds: 180, max_actions_per_hour: 40, max_actions_per_day: 500, session_break_every: 30, session_break_minutes: 10, recent_request_snooze_days: 3 },
+};
+const PRESET_KEYS = Object.keys(PRESETS);
+
 function fillSettings() {
   const settings = state.summary.settings;
   [
@@ -961,6 +1037,39 @@ function fillSettings() {
     "auto_minor_decisions",
     "recent_request_snooze_days",
   ].forEach((key) => { $(key).value = settings[key] || ""; });
+  highlightActivePreset(settings);
+}
+
+function highlightActivePreset(settings) {
+  let matched = null;
+  for (const name of PRESET_KEYS) {
+    const p = PRESETS[name];
+    const keys = Object.keys(p);
+    if (keys.every((k) => String(p[k]) === String(settings[k]))) {
+      matched = name;
+      break;
+    }
+  }
+  document.querySelectorAll(".presetBtn").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.preset === matched);
+  });
+  updatePacingWarning(settings, matched);
+}
+
+function updatePacingWarning(settings, preset) {
+  const el = $("pacingWarning");
+  if (!el) return;
+  const min = parseInt(settings.min_interval_seconds || "120", 10);
+  const max = parseInt(settings.max_interval_seconds || "300", 10);
+  const perHour = parseInt(settings.max_actions_per_hour || "20", 10);
+  const perDay = parseInt(settings.max_actions_per_day || "200", 10);
+  const label = preset ? preset.charAt(0).toUpperCase() + preset.slice(1) : "Custom";
+  const minMin = Math.floor(min / 60);
+  const minSec = min % 60;
+  const maxMin = Math.floor(max / 60);
+  const maxSec = max % 60;
+  const fmtTime = (m, s) => s > 0 ? `${m}m ${s}s` : `${m}m`;
+  el.textContent = `Current: ${label} — ${fmtTime(minMin, minSec)}–${fmtTime(maxMin, maxSec)} delays, ${perHour}/hour, ${perDay}/day.`;
 }
 
 async function saveSettings() {
@@ -978,6 +1087,18 @@ async function saveSettings() {
   await api("/api/settings", { method: "POST", body: JSON.stringify(body) });
   toast("Settings saved.");
   await refresh();
+}
+
+async function applyPreset(name) {
+  if (!PRESETS[name]) return;
+  const p = PRESETS[name];
+  Object.keys(p).forEach((key) => { $(key).value = p[key]; });
+  highlightActivePreset(p);
+  document.querySelectorAll(".presetBtn").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.preset === name);
+  });
+  await saveSettings();
+  toast(`Preset "${name}" applied.`);
 }
 
 async function refreshAdvice() {
@@ -1109,6 +1230,9 @@ function wireEvents() {
     await api("/api/clear-cooldown", { method: "POST", body: "{}" });
     toast("Cooldown cleared.");
     await refresh();
+  });
+  document.querySelectorAll(".presetBtn").forEach((btn) => {
+    btn.addEventListener("click", () => applyPreset(btn.dataset.preset).catch((error) => toast(error.message)));
   });
   $("backupBtn").addEventListener("click", async () => {
     const payload = await api("/api/backup", { method: "POST", body: "{}" });

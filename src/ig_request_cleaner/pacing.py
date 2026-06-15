@@ -7,15 +7,54 @@ from typing import Iterable
 
 
 DEFAULT_SETTINGS: dict[str, str] = {
-    "min_interval_seconds": "420",
-    "max_interval_seconds": "960",
-    "max_actions_per_hour": "8",
-    "max_actions_per_day": "60",
-    "session_break_every": "12",
-    "session_break_minutes": "45",
+    "min_interval_seconds": "120",
+    "max_interval_seconds": "300",
+    "max_actions_per_hour": "20",
+    "max_actions_per_day": "200",
+    "session_break_every": "20",
+    "session_break_minutes": "15",
     "auto_minor_decisions": "1",
-    "recent_request_snooze_days": "14",
+    "recent_request_snooze_days": "7",
     "next_allowed_at": "",
+}
+
+PRESETS: dict[str, dict[str, str]] = {
+    "conservative": {
+        "min_interval_seconds": "420",
+        "max_interval_seconds": "960",
+        "max_actions_per_hour": "8",
+        "max_actions_per_day": "60",
+        "session_break_every": "12",
+        "session_break_minutes": "45",
+        "recent_request_snooze_days": "14",
+    },
+    "balanced": {
+        "min_interval_seconds": "180",
+        "max_interval_seconds": "420",
+        "max_actions_per_hour": "15",
+        "max_actions_per_day": "120",
+        "session_break_every": "15",
+        "session_break_minutes": "30",
+        "recent_request_snooze_days": "10",
+    },
+    "aggressive": {
+        "min_interval_seconds": "120",
+        "max_interval_seconds": "300",
+        "max_actions_per_hour": "20",
+        "max_actions_per_day": "200",
+        "session_break_every": "20",
+        "session_break_minutes": "15",
+        "recent_request_snooze_days": "7",
+    },
+    "max": {
+        "min_interval_seconds": "60",
+        "max_interval_seconds": "180",
+        "max_actions_per_hour": "40",
+        "max_actions_per_day": "500",
+        "session_break_every": "30",
+        "session_break_minutes": "10",
+        "recent_request_snooze_days": "3",
+    },
 }
 
 
